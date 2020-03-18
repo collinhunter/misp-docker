@@ -14,7 +14,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@master
-
     - name: Zip the application files
       run: zip -r myapp.zip .
 
