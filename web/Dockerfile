@@ -8,6 +8,18 @@ RUN apt-get update && \
     apt-get dist-upgrade -y && apt-get autoremove -y && apt-get clean && \
     apt-get install -y software-properties-common && \
     apt-get install -y postfix && \
+    apt-get install -y mailutils && \
+    apt-get install -y libpq5 && \
+    apt-get install -y libjpeg-dev && \
+    apt-get install -y tesseract-ocr && \
+    apt-get install -y libpoppler-cpp-dev && \
+    apt-get install -y imagemagick && \
+    apt-get install -y libopencv-dev && \
+    apt-get install -y zbar-tools && \
+    apt-get install -y libzbar0 && \
+    apt-get install -y libzbar-dev && \
+    apt-get install -y libfuzzy-dev && \
+    apt-get install -y virtualenv && \
     apt-get install -y mysql-client curl gcc git gnupg-agent \
         make python openssl redis-server sudo vim zip locales
 
@@ -60,11 +72,13 @@ RUN pip3 install git+https://github.com/STIXProject/python-stix.git \
 USER www-data
 WORKDIR /var/www/MISP
 RUN git submodule init && git submodule update
+RUN chown -R www-data:www-data /var/www/MISP/.git
+
 WORKDIR /var/www/MISP/app
 
 # FIX COMPOSER
 RUN curl --fail --location -o composer-setup.php https://getcomposer.org/installer && \
-    EXPECTED_SIGNATURE="$(curl https://composer.github.io/installer.sig)"; php -r "if (hash_file('sha384', 'composer-setup.php') == '$(echo $EXPECTED_SIGNATURE)' ) { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" && \
+    EXPECTED_SIGNATURE="$(curl https://composer.github.io/installer.sig)"; php -r "if (hash_file('sha384', 'composer-setup.php') == '$(echo $EXPECTED_SIGNATURE)' ) { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('$
     php composer-setup.php && \
     php -r "unlink('composer-setup.php');"
 # END FIX
@@ -122,6 +136,7 @@ RUN sed -i -E "s/'salt'\s=>\s'(\S+)'/'salt' => '`openssl rand -base64 32|tr "/" 
 
 # Enable workers at boot time
 RUN chmod a+x /var/www/MISP/app/Console/worker/start.sh && \
+    echo "#!/bin/sh -e" >> /etc/rc.local && \
     echo "sudo -u www-data bash /var/www/MISP/app/Console/worker/start.sh" >>/etc/rc.local
 
 # Install templates & stuff
@@ -141,7 +156,8 @@ RUN git clone https://github.com/MISP/misp-modules.git
 RUN cd misp-modules && \
     pip3 install -I -r REQUIREMENTS && \
     pip3 install -I . && \
-    echo "sudo -u www-data misp-modules -s -l 127.0.0.1 &" >>/etc/rc.local
+    echo "sudo -u www-data misp-modules -l 127.0.0.1 &" >>/etc/rc.local && \
+    chmod +x /etc/rc.local
 
 # Supervisord Setup
 RUN ( \
@@ -173,18 +189,28 @@ RUN ( \
     echo 'startsecs = 0'; \
     echo 'autorestart = false'; \
 ) >> /etc/supervisor/conf.d/supervisord.conf
- 
+
 # Modify syslog configuration
 RUN sed -i -E 's/^(\s*)system\(\);/\1unix-stream("\/dev\/log");/' /etc/syslog-ng/syslog-ng.conf
 
 # Add run script
 # Trigger to perform first boot operations
-ADD run.sh /run.sh
+COPY run.sh /run.sh
 RUN chmod 0755 /run.sh && touch /.firstboot.tmp
 
 # Make a backup of /var/www/MISP to restore it to the local moint point at first boot
 WORKDIR /var/www/MISP
 RUN tar czpf /root/MISP.tgz .
+
+RUN sudo -H -u www-data pip3 install python-magic lief pydeep
+RUN sudo -H -u www-data pip3 install pyzmq
+RUN sudo -H -u www-data pip3 install pymisp
+
+# mail configuration
+COPY main.cf /etc/postfix
+COPY sasl_passwd /etc/postfix
+COPY generic /etc/postfix
+RUN sudo chown root:root /etc/postfix/* && sudo chmod 0600 /etc/postfix/generic && sudo chmod 0600 /etc/postfix/sasl_passwd  && sudo postmap /etc/postfix/generic && sudo postmap /etc/postfix/sasl_passwd && sudo service postfix restart
 
 VOLUME /var/www/MISP
 EXPOSE 80
