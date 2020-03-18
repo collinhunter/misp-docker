@@ -6,7 +6,7 @@
 # 2017/05/17 - Created
 # 2017/05/31 - Fixed small errors
 # 2019/10/17 - Use built-in mysql docker DB creation and use std env names (dafal)
-#
+# 2020/03/18 - Updated line 30 - wrong variable - was $POSTFIX_RELAY; changed to $POSTFIX_RELAY_HOST
 
 set -e
 
