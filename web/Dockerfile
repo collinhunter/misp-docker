@@ -8,17 +8,9 @@ RUN apt-get update && \
     apt-get dist-upgrade -y && apt-get autoremove -y && apt-get clean && \
     apt-get install -y software-properties-common && \
     apt-get install -y postfix && \
-    apt-get install -y mailutils && \
-    apt-get install -y libpq5 && \
-    apt-get install -y libjpeg-dev && \
-    apt-get install -y tesseract-ocr && \
-    apt-get install -y libpoppler-cpp-dev && \
-    apt-get install -y imagemagick && \
-    apt-get install -y libopencv-dev && \
-    apt-get install -y zbar-tools && \
-    apt-get install -y libzbar0 && \
-    apt-get install -y libzbar-dev && \
-    apt-get install -y libfuzzy-dev && \
+    apt-get install -y mailutils libpq5 libjpeg-dev tesseract-ocr && \
+    apt-get install -y libpoppler-cpp-dev imagemagick libopencv-dev && \
+    apt-get install -y zbar-tools libzbar0 libzbar-dev libfuzzy-dev && \
     apt-get install -y virtualenv && \
     apt-get install -y mysql-client curl gcc git gnupg-agent \
         make python openssl redis-server sudo vim zip locales
@@ -73,17 +65,14 @@ USER www-data
 WORKDIR /var/www/MISP
 RUN git submodule init && git submodule update
 RUN chown -R www-data:www-data /var/www/MISP/.git
-
 WORKDIR /var/www/MISP/app
 
 # FIX COMPOSER
 RUN curl --fail --location -o composer-setup.php https://getcomposer.org/installer && \
-    EXPECTED_SIGNATURE="$(curl https://composer.github.io/installer.sig)"; php -r "if (hash_file('sha384', 'composer-setup.php') == '$(echo $EXPECTED_SIGNATURE)' ) && \
-           { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" && \
+    EXPECTED_SIGNATURE="$(curl https://composer.github.io/installer.sig)"; php -r "if (hash_file('sha384', 'composer-setup.php') == '$(echo $EXPECTED_SIGNATURE)' ) { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" && \
     php composer-setup.php && \
     php -r "unlink('composer-setup.php');"
 # END FIX
-
 
 RUN php composer.phar update && \
     php composer.phar config vendor-dir Vendor && \
