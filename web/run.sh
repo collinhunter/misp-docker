@@ -6,7 +6,7 @@
 # 2017/05/17 - Created
 # 2017/05/31 - Fixed small errors
 # 2019/10/17 - Use built-in mysql docker DB creation and use std env names (dafal)
-# 2020/03/18 - Updated line 30 - wrong variable - was $POSTFIX_RELAY; changed to $POSTFIX_RELAY_HOST
+# 2020/03/20 - Updated to include misp-modules
 
 set -e
 
@@ -45,14 +45,14 @@ if [ -r /.firstboot.tmp ]; then
                 echo "MYSQL_HOST is not set. Aborting."
                 exit 1
         fi
-		
-		# Waiting for DB to be ready
-		while ! mysqladmin ping -h"$MYSQL_HOST" --silent; do
-		    sleep 5
-			echo "Waiting for database to be ready..."
-		done
-		
-        # Set MYSQL_PASSWORD
+
+                # Waiting for DB to be ready
+                while ! mysqladmin ping -h"$MYSQL_HOST" --silent; do
+                    sleep 5
+                        echo "Waiting for database to be ready..."
+                done
+
+ # Set MYSQL_PASSWORD
         if [ -z "$MYSQL_PASSWORD" ]; then
                 echo "MYSQL_PASSWORD is not set, use default value 'misp'"
                 MYSQL_PASSWORD=misp
@@ -85,8 +85,7 @@ if [ -r /.firstboot.tmp ]; then
                 echo "ERROR: Connecting to database failed:"
                 echo $ret
         fi
-
-        # MISP configuration
+# MISP configuration
         echo "Creating MISP configuration files"
         cd /var/www/MISP/app/Config
         cp -a database.default.php database.php
@@ -110,42 +109,42 @@ if [ -r /.firstboot.tmp ]; then
         else
                 echo "Generating admin PGP key ... (please be patient, we need some entropy)"
                 cat >/tmp/gpg.tmp <<GPGEOF
-%echo Generating a basic OpenPGP key
-Key-Type: RSA
-Key-Length: 2048
-Name-Real: MISP Admin
-Name-Email: $MISP_ADMIN_EMAIL
-Expire-Date: 0
-Passphrase: $MISP_ADMIN_PASSPHRASE
-%commit
-%echo Done
-GPGEOF
+		%echo Generating a basic OpenPGP key
+		Key-Type: RSA
+		Key-Length: 2048
+		Name-Real: MISP Admin
+		Name-Email: $MISP_ADMIN_EMAIL
+		Expire-Date: 0
+		Passphrase: $MISP_ADMIN_PASSPHRASE
+		%commit
+		%echo Done
+		GPGEOF
                 sudo -u www-data gpg --homedir /var/www/MISP/.gnupg --gen-key --batch /tmp/gpg.tmp >>/tmp/install.log
                 rm -f /tmp/gpg.tmp
-		sudo -u www-data gpg --homedir /var/www/MISP/.gnupg --export --armor $MISP_ADMIN_EMAIL > /var/www/MISP/app/webroot/gpg.asc
+                sudo -u www-data gpg --homedir /var/www/MISP/.gnupg --export --armor $MISP_ADMIN_EMAIL > /var/www/MISP/app/webroot/gpg.asc
         fi
 
         # Display tips
         cat <<__WELCOME__
-Congratulations!
-Your MISP docker has been successfully booted for the first time.
-Don't forget:
-- Reconfigure postfix to match your environment
-- Change the MISP admin email address to $MISP_ADMIN_EMAIL
+		Congratulations!
+		Your MISP docker has been successfully booted for the first time.
+		Don't forget:
+		- Reconfigure postfix to match your environment
+		- Change the MISP admin email address to $MISP_ADMIN_EMAIL
 
-__WELCOME__
-        rm -f /.firstboot.tmp
-fi
+		__WELCOME__
+				rm -f /.firstboot.tmp
+		fi
 
 # Make MISP live - this isn't ideal, as it means taking an instance
 # non-live will make it live again if the container restarts.  That seems
 # better than the default which is that MISP is non-live on container restart.
 # Ideally live/non-live would be persisted in the database.
-/var/www/MISP/app/Console/cake live 1
-chown www-data:www-data /var/www/MISP/app/Config/config.php*
-
+	/var/www/MISP/app/Console/cake live 1
+	chown www-data:www-data /var/www/MISP/app/Config/config.php*
 # Start supervisord
-echo "Starting supervisord"
-cd /
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
-          
+	echo "Starting supervisord"
+	cd /
+	sudo -u www-data bash /var/www/MISP/app/Console/worker/start.sh &
+	sudo -u www-data misp-modules -l 127.0.0.1 &
+	exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
