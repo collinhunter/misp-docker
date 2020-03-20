@@ -38,6 +38,7 @@ smtp_generic_maps = hash:/etc/postfix/generic
 smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
 # See /usr/share/doc/postfix/TLS_README.gz in the postfix-doc package for
 # information on enabling SSL in the smtp client.
+# this is for Office 365 Relay - will get overridden by .env
 relayhost = [smtp.office365.com]:587
 
 smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
